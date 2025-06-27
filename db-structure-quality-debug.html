@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Datenbankstruktur-Qualitätsprüfung (Debug)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      color: #333;
+    }
+    h1, h2 {
+      color: #2563eb;
+    }
+    button {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 8px;
+      margin-bottom: 16px;
+    }
+    button:hover {
+      background-color: #1d4ed8;
+    }
+    #outputContainer {
+      margin-top: 20px;
+      padding: 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+    }
+    #report {
+      background-color: #f9fafb;
+      padding: 16px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+    }
+    .loader {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 2s linear infinite;
+      margin: 20px auto;
+      display: none;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .error {
+      color: #b91c1c;
+      font-weight: bold;
+    }
+    .back-link {
+      display: inline-block;
+      margin-top: 20px;
+      color: #2563eb;
+      text-decoration: none;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    iframe {
+      width: 100%;
+      height: 600px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Datenbankstruktur-Qualitätsprüfung (Debug)</h1>
+  <p>Dieses Tool prüft die Datenbankstruktur auf Einhaltung der Qualitätsregeln.</p>
+  <p><strong>Hinweis:</strong> Sie müssen angemeldet sein, um diese Prüfung ausführen zu können. Wenn Sie einen Authentifizierungsfehler erhalten, melden Sie sich bitte zuerst an.</p>
+  
+  <div>
+    <button id="runCheck">Prüfung starten</button>
+    <button id="showHtmlReport">HTML-Bericht anzeigen</button>
+    <a href="/login" class="back-link" style="margin-right: 15px;">Anmelden</a>
+    <a href="/" class="back-link">← Zurück zur Hauptseite</a>
+  </div>
+  
+  <div id="outputContainer">
+    <div class="loader" id="loader"></div>
+    <div id="report">Klicken Sie auf "Prüfung starten", um die Datenbankstrukturprüfung zu beginnen.</div>
+  </div>
+  
+  <div id="htmlReportContainer" style="display: none;">
+    <h2>HTML-Bericht</h2>
+    <iframe id="htmlReport" src=""></iframe>
+  </div>
+
+  <script>
+    document.getElementById('runCheck').addEventListener('click', async () => {
+      try {
+        document.getElementById('loader').style.display = 'block';
+        document.getElementById('report').innerHTML = 'Prüfung läuft...';
+        
+        // Zuerst versuchen, den Debug-Endpunkt ohne Authentifizierung zu nutzen
+        let response;
+        try {
+          response = await fetch('/api/debug/db-structure/report');
+        } catch (error) {
+          console.error("Debug-Endpunkt nicht verfügbar, versuche normalen Endpunkt:", error);
+          response = await fetch('/api/admin/data-quality/report');
+        }
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error(`Nicht authentifiziert. Bitte melden Sie sich zuerst an.`);
+          } else {
+            throw new Error(`HTTP-Fehler: ${response.status}`);
+          }
+        }
+        
+        const data = await response.json();
+        document.getElementById('report').innerHTML = JSON.stringify(data, null, 2);
+      } catch (error) {
+        document.getElementById('report').innerHTML = `<span class="error">Fehler: ${error.message}</span>`;
+      } finally {
+        document.getElementById('loader').style.display = 'none';
+      }
+    });
+    
+    document.getElementById('showHtmlReport').addEventListener('click', async () => {
+      try {
+        document.getElementById('htmlReportContainer').style.display = 'block';
+        
+        // Erst versuchen, den Debug-Endpunkt ohne Authentifizierung zu nutzen
+        let url;
+        try {
+          const testResponse = await fetch('/api/debug/data-quality/html-report');
+          if (testResponse.ok) {
+            url = '/api/debug/data-quality/html-report';
+          } else {
+            // Fallback auf normalen Endpunkt
+            url = '/api/admin/data-quality/db-structure-report';
+          }
+        } catch (error) {
+          console.error("Debug-Endpunkt nicht verfügbar, versuche normalen Endpunkt:", error);
+          url = '/api/admin/data-quality/db-structure-report';
+        }
+        
+        document.getElementById('htmlReport').src = url;
+      } catch (error) {
+        alert(`Fehler beim Laden des HTML-Berichts: ${error.message}`);
+      }
+    });
+  </script>
+</body>
+</html>
